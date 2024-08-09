@@ -20,21 +20,13 @@ fn main() {
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
-    let mut rng = rand::thread_rng();
-    let mut grid: Vec<Vec<bool>> = (0..WINDOW_HEIGHT as usize / CELL_SIZE)
-        .map(|_| {
-            (0..WINDOW_WIDTH as usize / CELL_SIZE)
-                .map(|_| rng.gen_bool(0.2))
-                .collect()
-        })
-        .collect();
+    let mut grid = new_grid();
 
     'running: loop {
         for event in sdl_context.event_pump().unwrap().poll_iter() {
-            match event {
-                Event::Quit { .. } => break 'running,
-                _ => (),
-            };
+            if let Event::Quit { .. } = event {
+                break 'running;
+            }
         }
 
         canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -42,7 +34,11 @@ fn main() {
 
         canvas.set_draw_color(Color::RGB(255, 255, 255));
 
-        for y in 0..WINDOW_HEIGHT as usize / CELL_SIZE {
+        for (y, _) in grid
+            .iter()
+            .enumerate()
+            .take(WINDOW_HEIGHT as usize / CELL_SIZE)
+        {
             for x in 0..WINDOW_WIDTH as usize / CELL_SIZE {
                 if grid[y][x] {
                     canvas
@@ -58,29 +54,40 @@ fn main() {
         }
 
         canvas.present();
-
-        let mut new_grid = grid.clone();
-        for y in 0..WINDOW_HEIGHT as usize / CELL_SIZE {
-            for x in 0..WINDOW_WIDTH as usize / CELL_SIZE {
-                let neighbors = count_neighbors(&grid, x, y);
-                if grid[y][x] {
-                    if neighbors < 2 || neighbors > 3 {
-                        new_grid[y][x] = false;
-                    }
-                } else {
-                    if neighbors == 3 {
-                        new_grid[y][x] = true;
-                    }
-                }
-            }
-        }
-        grid = new_grid;
+        update_grid(&mut grid);
 
         std::thread::sleep(Duration::from_millis(100));
     }
 }
 
-fn count_neighbors(grid: &Vec<Vec<bool>>, x: usize, y: usize) -> usize {
+fn new_grid() -> Vec<Vec<bool>> {
+    let mut rng = rand::thread_rng();
+    (0..WINDOW_HEIGHT as usize / CELL_SIZE)
+        .map(|_| {
+            (0..WINDOW_WIDTH as usize / CELL_SIZE)
+                .map(|_| rng.gen_bool(0.2))
+                .collect()
+        })
+        .collect()
+}
+fn update_grid(grid: &mut Vec<Vec<bool>>) {
+    let mut new_grid = grid.clone();
+    for y in 0..WINDOW_HEIGHT as usize / CELL_SIZE {
+        for x in 0..WINDOW_WIDTH as usize / CELL_SIZE {
+            let neighbors = count_neighbors(grid, x, y);
+            if grid[y][x] {
+                if !(2..=3).contains(&neighbors) {
+                    new_grid[y][x] = false;
+                }
+            } else if neighbors == 3 {
+                new_grid[y][x] = true;
+            }
+        }
+    }
+    *grid = new_grid;
+}
+
+fn count_neighbors(grid: &[Vec<bool>], x: usize, y: usize) -> usize {
     let mut count = 0;
     for dy in -1..=1 {
         for dx in -1..=1 {
